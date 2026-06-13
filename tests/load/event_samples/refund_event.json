@@ -1,0 +1,9 @@
+{
+  "event_type": "refund_initiated",
+  "refund_id": "ref_{{uuid}}",
+  "original_tx_id": "txn_{{uuid}}",
+  "merchant_id": "merch_{{randint(1,500)}}",
+  "refund_amount": "{{randint(100,500000)/100}}",
+  "reason_code": "{{choice(['customer_request','fraud','duplicate','product_not_received'])}}",
+  "timestamp": "{{now_iso}}"
+}

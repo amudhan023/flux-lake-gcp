@@ -1,0 +1,36 @@
+{
+  "uid": "data-quality",
+  "title": "Data Quality",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "60s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Null Rate by Column",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "dq_null_rate", "legendFormat": "{{table}}.{{column}}"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Duplicate Record Count",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "sum(dq_duplicate_count)", "legendFormat": "Total Dupes"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Reconciliation Discrepancies",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {"expr": "dq_reconciliation_discrepancy_total", "legendFormat": "{{type}}"}
+      ]
+    }
+  ]
+}

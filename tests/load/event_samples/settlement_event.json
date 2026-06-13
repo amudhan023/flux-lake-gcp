@@ -1,0 +1,9 @@
+{
+  "event_type": "settlement_processed",
+  "batch_id": "batch_{{uuid}}",
+  "merchant_id": "merch_{{randint(1,500)}}",
+  "gross_amount": "{{randint(10000,10000000)/100}}",
+  "fees": "{{gross_amount * 0.02}}",
+  "net_amount": "{{gross_amount - fees}}",
+  "timestamp": "{{now_iso}}"
+}

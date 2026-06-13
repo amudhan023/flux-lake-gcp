@@ -1,0 +1,27 @@
+{
+  "uid": "kafka-topics",
+  "title": "Kafka Topics",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "15s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Messages Consumed Total",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "rate(kafka_messages_consumed_total[1m])", "legendFormat": "{{topic}} msg/s"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Consumer Lag",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "kafka_consumer_lag", "legendFormat": "{{topic}} / partition {{partition}}"}
+      ]
+    }
+  ]
+}

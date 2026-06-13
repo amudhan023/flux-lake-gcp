@@ -1,0 +1,57 @@
+{
+  "uid": "spark-performance",
+  "title": "Spark Performance",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Spark Job Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "spark_job_duration_seconds",
+          "legendFormat": "{{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Shuffle Bytes Written",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "spark_shuffle_bytes_written",
+          "legendFormat": "{{job_id}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Executor Memory Used (bytes)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "spark_executor_memory_used_bytes",
+          "legendFormat": "{{executor_id}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Task Failures",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "sum(spark_task_failure_total)",
+          "legendFormat": "Total Failures"
+        }
+      ]
+    }
+  ]
+}

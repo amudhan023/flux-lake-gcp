@@ -1,0 +1,9 @@
+{
+  "event_type": "chargeback_filed",
+  "dispute_id": "chbk_{{uuid}}",
+  "original_tx_id": "txn_{{uuid}}",
+  "merchant_id": "merch_{{randint(1,500)}}",
+  "dispute_amount": "{{randint(100,1000000)/100}}",
+  "status": "{{choice(['filed','under_review','resolved_merchant','resolved_customer'])}}",
+  "timestamp": "{{now_iso}}"
+}

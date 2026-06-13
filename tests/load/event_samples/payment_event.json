@@ -1,0 +1,11 @@
+{
+  "event_type": "payment_created",
+  "transaction_id": "txn_{{uuid}}",
+  "merchant_id": "merch_{{randint(1,500)}}",
+  "customer_id": "cust_{{randint(1,10000)}}",
+  "amount": "{{randint(100,5000000)/100}}",
+  "currency": "{{choice(['USD','EUR','GBP','SGD'])}}",
+  "gateway": "{{choice(['stripe','adyen','braintree','paypal'])}}",
+  "region": "{{choice(['us-east','us-west','eu-west','ap-south'])}}",
+  "timestamp": "{{now_iso}}"
+}

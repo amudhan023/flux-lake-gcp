@@ -1,0 +1,50 @@
+{
+  "uid": "sla-tracking",
+  "title": "SLA Tracking — Slow vs Optimized",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Pipeline Run Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "pipeline_run_duration_seconds",
+          "legendFormat": "{{pipeline_name}} / {{stage}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Pipeline SLA — Last 7 Runs",
+      "type": "barchart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "pipeline_sla_seconds",
+          "legendFormat": "{{pipeline_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Last Pipeline Success",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "pipeline_last_success_timestamp",
+          "legendFormat": "{{pipeline_name}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso"
+        }
+      }
+    }
+  ]
+}

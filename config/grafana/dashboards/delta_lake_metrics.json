@@ -1,0 +1,37 @@
+{
+  "uid": "delta-lake-metrics",
+  "title": "Delta Lake Health",
+  "schemaVersion": 36,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Files Before / After OPTIMIZE",
+      "type": "bargauge",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "delta_files_before_optimize", "legendFormat": "Before - {{table}}"},
+        {"expr": "delta_files_after_optimize", "legendFormat": "After - {{table}}"}
+      ]
+    },
+    {
+      "id": 2,
+      "title": "OPTIMIZE Duration (seconds)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "delta_optimize_duration_seconds", "legendFormat": "{{table}}"}
+      ]
+    },
+    {
+      "id": 3,
+      "title": "VACUUM Files Deleted",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "targets": [
+        {"expr": "sum(delta_vacuum_files_deleted)", "legendFormat": "Total Files Vacuumed"}
+      ]
+    }
+  ]
+}
