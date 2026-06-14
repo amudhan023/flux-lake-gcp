@@ -1,12 +1,15 @@
 .PHONY: up down infra-up infra-down seed run-pipeline load-test test test-unit \
-        test-integration test-dq benchmark logs grafana kibana jaeger help
+        test-integration test-dq benchmark logs grafana kibana jaeger \
+        gcp-up gcp-down gcp-seed gcp-run-pipeline gcp-logs help
 
 include .env.example
 -include .env
+-include .env.gcp
 export
 
-COMPOSE      = docker compose -f docker-compose.yml
-COMPOSE_INFRA = docker compose -f docker-compose.infra.yml
+COMPOSE        = docker compose -f docker-compose.yml
+COMPOSE_INFRA  = docker compose -f docker-compose.infra.yml
+COMPOSE_GCP    = docker compose -f docker-compose.yml -f docker-compose.gcp.yml
 
 GRAFANA_URL  = http://localhost:3000
 KIBANA_URL   = http://localhost:5601
@@ -16,6 +19,7 @@ help:
 	@echo ""
 	@echo "  Pipeline Project — Make Targets"
 	@echo "  ────────────────────────────────────────────────────"
+	@echo "  Local (MinIO / Docker Compose)"
 	@echo "  make up               Start full stack"
 	@echo "  make down             Tear down full stack"
 	@echo "  make infra-up         Start infra only (Spark, Kafka, MinIO, obs.)"
@@ -32,6 +36,13 @@ help:
 	@echo "  make grafana          Open Grafana in browser"
 	@echo "  make kibana           Open Kibana in browser"
 	@echo "  make jaeger           Open Jaeger in browser"
+	@echo ""
+	@echo "  GCP (Google Cloud Storage backend)"
+	@echo "  make gcp-up           Start stack on GCP (requires .env.gcp)"
+	@echo "  make gcp-down         Tear down GCP stack"
+	@echo "  make gcp-seed         Seed Bronze data on GCP"
+	@echo "  make gcp-run-pipeline Trigger pipeline on GCP"
+	@echo "  make gcp-logs         Tail GCP stack logs"
 	@echo ""
 
 up:
@@ -128,3 +139,33 @@ kibana:
 jaeger:
 	open $(JAEGER_URL) 2>/dev/null || xdg-open $(JAEGER_URL) 2>/dev/null || \
 		echo "Open browser: $(JAEGER_URL)"
+
+# ─── GCP Targets ─────────────────────────────────────────────────────────────
+
+gcp-up:
+	@echo "Starting stack on GCP (GCS backend, no MinIO)..."
+	@test -f .env.gcp || (echo "ERROR: .env.gcp not found. Copy .env.gcp.example and fill in values." && exit 1)
+	$(COMPOSE_GCP) --env-file .env.gcp up -d \
+		--scale spark-worker-1=$(or $(SPARK_WORKERS),2)
+	@echo ""
+	@echo "GCP stack is up. Service URLs (replace <VM-IP> with your GCE external IP):"
+	@echo "  Spark UI:     http://<VM-IP>:8080"
+	@echo "  Kafka UI:     http://<VM-IP>:8090"
+	@echo "  Grafana:      http://<VM-IP>:3000  (admin / see .env.gcp)"
+	@echo "  Jaeger:       http://<VM-IP>:16686"
+	@echo "  Kibana:       http://<VM-IP>:5601"
+	@echo "  Pipeline API: http://<VM-IP>:8000"
+
+gcp-down:
+	$(COMPOSE_GCP) --env-file .env.gcp down -v
+
+gcp-seed:
+	@echo "Seeding Bronze data (GCS backend)..."
+	$(COMPOSE_GCP) --env-file .env.gcp exec pipeline-api python /app/scripts/seed_data.py
+
+gcp-run-pipeline:
+	@echo "Triggering pipeline on GCP..."
+	curl -s -X POST http://localhost:8000/trigger | python3 -m json.tool
+
+gcp-logs:
+	$(COMPOSE_GCP) --env-file .env.gcp logs -f --tail=100

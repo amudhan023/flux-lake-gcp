@@ -92,10 +92,13 @@ def ingest_from_kafka(spark: SparkSession, run_id: str = "manual") -> dict[str, 
                 kafka_messages_consumed.labels(topic=topic).inc(cnt)
                 logger.info("Bronze ingest batch complete", extra={"records_count": cnt})
 
+        # CHECKPOINT_BASE defaults to /tmp for local dev.
+        # On GCP set it to a GCS path: gs://<bucket>/checkpoints
+        checkpoint_base = os.getenv("CHECKPOINT_BASE", "/tmp/checkpoints")
         query = (
             raw_df.writeStream
             .foreachBatch(process_batch)
-            .option("checkpointLocation", f"/tmp/checkpoints/bronze_{run_id}")
+            .option("checkpointLocation", f"{checkpoint_base}/bronze_{run_id}")
             .trigger(availableNow=True)
             .start()
         )

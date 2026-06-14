@@ -1,0 +1,91 @@
+# GCP overlay for docker-compose.yml
+# Usage (on a GCE VM):
+#   docker compose -f docker-compose.yml -f docker-compose.gcp.yml up -d
+#
+# What this file does:
+#   • Removes MinIO and minio-init (replaced by Google Cloud Storage)
+#   • Injects GCS / GCP environment variables into all Spark containers and the API
+#   • Mounts the GCP service account key into containers that need storage access
+#   • Fixes Kafka's advertised listener to use the VM's external IP
+#   • Swaps the Spark config for the GCS-aware spark-defaults-gcp.conf
+#   • Removes the MinIO scrape job from Prometheus
+
+version: "3.9"
+
+services:
+  # ─── Disable MinIO — GCS is the data lake on GCP ───────────────────────────
+  minio:
+    profiles: ["local-only"]
+
+  minio-init:
+    profiles: ["local-only"]
+
+  # ─── Spark: use GCS connector config ────────────────────────────────────────
+  spark-master:
+    environment:
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
+    volumes:
+      - ./src:/app/src
+      - ./config/spark/spark-defaults-gcp.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ${GCP_SA_KEY_PATH}:/etc/gcp/sa-key.json:ro
+    depends_on: []
+
+  spark-worker-1:
+    environment:
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
+    volumes:
+      - ./src:/app/src
+      - ./config/spark/spark-defaults-gcp.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ${GCP_SA_KEY_PATH}:/etc/gcp/sa-key.json:ro
+
+  spark-worker-2:
+    environment:
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
+    volumes:
+      - ./src:/app/src
+      - ./config/spark/spark-defaults-gcp.conf:/opt/bitnami/spark/conf/spark-defaults.conf
+      - ${GCP_SA_KEY_PATH}:/etc/gcp/sa-key.json:ro
+
+  # ─── Kafka: advertise the VM's external IP for external producers ────────────
+  # Set GCE_EXTERNAL_IP in your .env.gcp file to the VM's external IP address.
+  kafka:
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${GCE_EXTERNAL_IP:-localhost}:29092
+
+  # ─── Pipeline API: point to GCS instead of MinIO ────────────────────────────
+  pipeline-api:
+    environment:
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET}
+      - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
+      - CHECKPOINT_BASE=gs://${GCS_BUCKET}/checkpoints
+      - MINIO_ENDPOINT=
+      - AWS_ACCESS_KEY_ID=
+      - AWS_SECRET_ACCESS_KEY=
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ${GCP_SA_KEY_PATH}:/etc/gcp/sa-key.json:ro
+    depends_on:
+      - spark-master
+      - kafka
+
+  # ─── Prometheus: GCP-specific config without MinIO scrape ───────────────────
+  prometheus:
+    volumes:
+      - ./config/prometheus/prometheus-gcp.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+
+  # ─── Filebeat: use Docker socket only if available on the GCE VM ────────────
+  # On GKE, disable filebeat entirely and use Cloud Logging instead.
+  # On a GCE VM with Docker this works as-is; remove if deploying to GKE.
+  filebeat:
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
