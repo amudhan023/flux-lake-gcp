@@ -13,7 +13,7 @@ pyspark --master spark://spark-master:7077
 
 # 3. Delete the Gold partition for the date to reprocess
 from delta.tables import DeltaTable
-dt = DeltaTable.forPath(spark, "s3a://data-lake/gold/daily_merchant_summary")
+dt = DeltaTable.forPath(spark, "gs://data-lake/gold/daily_merchant_summary")
 dt.delete("report_date = '2026-01-15'")
 
 # 4. Trigger pipeline with specific date
@@ -73,7 +73,7 @@ docker compose up -d --scale spark-worker-1=4
 If Silver is stuck mid-MERGE:
 ```bash
 # List Delta transaction log to confirm last committed version
-spark.sql("DESCRIBE HISTORY delta.`s3a://data-lake/silver/cleansed_transactions`").show(5)
+spark.sql("DESCRIBE HISTORY delta.`gs://data-lake/silver/cleansed_transactions`").show(5)
 ```
 
 The last `COMMIT` entry is the authoritative state. Anything after it was rolled back automatically.
@@ -82,7 +82,7 @@ The last `COMMIT` entry is the authoritative state. Anything after it was rolled
 
 | Symptom | Likely Cause | Fix |
 |---------|-------------|-----|
-| `Connection refused: minio:9000` | MinIO not healthy yet | `make logs minio` — wait for "S3-API: http://..." |
+| `Connection refused: fake-gcs-server:4443` | GCS emulator not healthy yet | `make logs fake-gcs-server` — wait for `server started` |
 | Spark OOM executor killed | `SPARK_EXECUTOR_MEMORY` too low | Set `SPARK_EXECUTOR_MEMORY=8g` in `.env`, `make down && make up` |
 | Kafka `LEADER_NOT_AVAILABLE` | Kafka still initializing | Wait 30s; brokers elect leader within 15s |
 | Delta `TransactionConflictException` | Two writers racing on same partition | Normal — Delta retries automatically. If persistent, reduce Spark workers. |

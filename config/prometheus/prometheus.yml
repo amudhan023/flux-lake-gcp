@@ -16,12 +16,6 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: instance
 
-  - job_name: "minio"
-    static_configs:
-      - targets: ["minio:9000"]
-    metrics_path: /minio/v2/metrics/cluster
-    scheme: http
-
   - job_name: "otel-collector"
     static_configs:
       - targets: ["otel-collector:8888"]

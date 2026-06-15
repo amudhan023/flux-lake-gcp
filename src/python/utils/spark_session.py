@@ -1,8 +1,11 @@
 import os
 from pyspark.sql import SparkSession
 
-# Set STORAGE_BACKEND=gcs to use Google Cloud Storage instead of MinIO/S3A.
-STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "s3a")
+# STORAGE_BACKEND controls which connector Spark uses:
+#   gcs   — GCS connector (default). Uses fake-gcs-server locally when
+#            GCS_EMULATOR_HOST is set; uses real GCS on production GCE/GKE.
+#   local — No connector (plain file paths). Used in tests only.
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "gcs")
 
 
 def get_spark_session(app_name: str = "pipeline", local: bool = False) -> SparkSession:
@@ -19,37 +22,31 @@ def get_spark_session(app_name: str = "pipeline", local: bool = False) -> SparkS
         .config("spark.sql.shuffle.partitions", "200")
     )
 
-    if STORAGE_BACKEND == "gcs":
+    if STORAGE_BACKEND == "local":
+        # Plain local filesystem — no storage connector needed. Used in tests.
+        packages = ["io.delta:delta-spark_2.12:3.2.0"]
+    else:
         # Google Cloud Storage via the Hadoop GCS connector.
-        # Auth is handled by Application Default Credentials (ADC) on GCE/GKE,
-        # or by GOOGLE_APPLICATION_CREDENTIALS pointing to a service account key.
+        # When GCS_EMULATOR_HOST is set, traffic is redirected to fake-gcs-server
+        # (local dev). When unset, Application Default Credentials handle auth
+        # against real GCS (production GCE/GKE).
         builder = (
             builder
             .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
             .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
         )
+        emulator_host = os.getenv("GCS_EMULATOR_HOST")
+        if emulator_host:
+            builder = (
+                builder
+                .config("spark.hadoop.fs.gs.storage.root.url", f"http://{emulator_host}")
+                .config("spark.hadoop.google.cloud.auth.service.account.enable", "false")
+            )
+        else:
+            builder = builder.config("spark.hadoop.google.cloud.auth.service.account.enable", "true")
         packages = [
             "io.delta:delta-spark_2.12:3.2.0",
             "com.google.cloud.bigdataoss:gcs-connector:hadoop3-2.2.22",
-        ]
-    else:
-        # MinIO / AWS S3 via the S3A connector (local development default).
-        endpoint = os.getenv("MINIO_ENDPOINT", "http://minio:9000")
-        access_key = os.getenv("AWS_ACCESS_KEY_ID", "minioadmin")
-        secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "minioadmin123")
-        builder = (
-            builder
-            .config("spark.hadoop.fs.s3a.endpoint", endpoint)
-            .config("spark.hadoop.fs.s3a.path.style.access", "true")
-            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-            .config("spark.hadoop.fs.s3a.access.key", access_key)
-            .config("spark.hadoop.fs.s3a.secret.key", secret_key)
-        )
-        packages = [
-            "io.delta:delta-spark_2.12:3.2.0",
-            "org.apache.hadoop:hadoop-aws:3.3.4",
-            "com.amazonaws:aws-java-sdk-bundle:1.12.262",
         ]
 
     builder = builder.config("spark.jars.packages", ",".join(packages))

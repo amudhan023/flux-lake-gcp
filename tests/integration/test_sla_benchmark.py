@@ -18,8 +18,8 @@ def test_optimized_faster_than_baseline(spark, tmp_path):
 
     records = [asdict(PaymentEvent.generate()) for _ in range(1000)]
 
-    os.environ["S3_ENDPOINT"] = f"file://{tmp_path}"
-    os.environ["S3_BUCKET"] = ""
+    os.environ["STORAGE_BACKEND"] = "local"
+    os.environ["GCS_BUCKET"] = str(tmp_path)
 
     ingest_batch(spark, records, run_id="bench-seed")
 

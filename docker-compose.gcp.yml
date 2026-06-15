@@ -3,28 +3,29 @@
 #   docker compose -f docker-compose.yml -f docker-compose.gcp.yml up -d
 #
 # What this file does:
-#   • Removes MinIO and minio-init (replaced by Google Cloud Storage)
+#   • Disables fake-gcs-server and fake-gcs-init (real GCS is the data lake)
 #   • Injects GCS / GCP environment variables into all Spark containers and the API
 #   • Mounts the GCP service account key into containers that need storage access
 #   • Fixes Kafka's advertised listener to use the VM's external IP
 #   • Swaps the Spark config for the GCS-aware spark-defaults-gcp.conf
-#   • Removes the MinIO scrape job from Prometheus
+#   • Removes the fake-gcs-server scrape job from Prometheus (GCS has no metrics endpoint)
 
 version: "3.9"
 
 services:
-  # ─── Disable MinIO — GCS is the data lake on GCP ───────────────────────────
-  minio:
+  # ─── Disable local GCS emulator — real GCS is the data lake on GCP ──────────
+  fake-gcs-server:
     profiles: ["local-only"]
 
-  minio-init:
+  fake-gcs-init:
     profiles: ["local-only"]
 
-  # ─── Spark: use GCS connector config ────────────────────────────────────────
+  # ─── Spark: clear emulator, use real GCS with service account ───────────────
   spark-master:
     environment:
       - STORAGE_BACKEND=gcs
       - GCS_BUCKET=${GCS_BUCKET}
+      - GCS_EMULATOR_HOST=
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
     volumes:
       - ./src:/app/src
@@ -36,6 +37,7 @@ services:
     environment:
       - STORAGE_BACKEND=gcs
       - GCS_BUCKET=${GCS_BUCKET}
+      - GCS_EMULATOR_HOST=
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
     volumes:
       - ./src:/app/src
@@ -46,6 +48,7 @@ services:
     environment:
       - STORAGE_BACKEND=gcs
       - GCS_BUCKET=${GCS_BUCKET}
+      - GCS_EMULATOR_HOST=
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
     volumes:
       - ./src:/app/src
@@ -58,16 +61,14 @@ services:
     environment:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${GCE_EXTERNAL_IP:-localhost}:29092
 
-  # ─── Pipeline API: point to GCS instead of MinIO ────────────────────────────
+  # ─── Pipeline API: clear emulator, use real GCS ──────────────────────────────
   pipeline-api:
     environment:
       - STORAGE_BACKEND=gcs
       - GCS_BUCKET=${GCS_BUCKET}
+      - GCS_EMULATOR_HOST=
       - GOOGLE_APPLICATION_CREDENTIALS=/etc/gcp/sa-key.json
       - CHECKPOINT_BASE=gs://${GCS_BUCKET}/checkpoints
-      - MINIO_ENDPOINT=
-      - AWS_ACCESS_KEY_ID=
-      - AWS_SECRET_ACCESS_KEY=
     volumes:
       - ./src:/app/src
       - ./scripts:/app/scripts
@@ -76,7 +77,7 @@ services:
       - spark-master
       - kafka
 
-  # ─── Prometheus: GCP-specific config without MinIO scrape ───────────────────
+  # ─── Prometheus: GCP-specific config without GCS emulator scrape ────────────
   prometheus:
     volumes:
       - ./config/prometheus/prometheus-gcp.yml:/etc/prometheus/prometheus.yml

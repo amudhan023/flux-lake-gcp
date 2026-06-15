@@ -21,8 +21,8 @@ def test_full_pipeline_bronze_to_gold(spark_integration, tmp_path):
     from src.python.pipeline.silver.reconciliation import run_reconciliation
     from src.python.pipeline.gold.daily_aggregations import run_gold_aggregations
 
-    os.environ["S3_ENDPOINT"] = f"file://{tmp_path}"
-    os.environ["S3_BUCKET"] = ""
+    os.environ["STORAGE_BACKEND"] = "local"
+    os.environ["GCS_BUCKET"] = str(tmp_path)
 
     payments = [asdict(PaymentEvent.generate()) for _ in range(800)]
     settlements = [asdict(SettlementEvent.generate("merch_1", 5000.0)) for _ in range(8)]

@@ -5,7 +5,6 @@ networks:
     driver: bridge
 
 volumes:
-  minio-data:
   kafka-data:
   prometheus-data:
   grafana-data:
@@ -19,8 +18,9 @@ services:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
       - SPARK_RPC_ENCRYPTION_ENABLED=no
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET:-data-lake}
+      - GCS_EMULATOR_HOST=fake-gcs-server:4443
     ports:
       - "8080:8080"
       - "7077:7077"
@@ -44,8 +44,9 @@ services:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - SPARK_WORKER_MEMORY=${SPARK_EXECUTOR_MEMORY:-4g}
       - SPARK_WORKER_CORES=${SPARK_EXECUTOR_CORES:-2}
-      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER:-minioadmin}
-      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - STORAGE_BACKEND=gcs
+      - GCS_BUCKET=${GCS_BUCKET:-data-lake}
+      - GCS_EMULATOR_HOST=fake-gcs-server:4443
     ports:
       - "8081:8081"
     volumes:
@@ -56,37 +57,33 @@ services:
     depends_on:
       - spark-master
 
-  minio:
-    image: minio/minio:latest
-    container_name: minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+  # ─── fake-gcs-server (local GCS emulator) ────────────────────────────────────
+  fake-gcs-server:
+    image: fsouza/fake-gcs-server:latest
+    container_name: fake-gcs-server
+    command: ["-scheme", "http", "-port", "4443", "-backend", "memory"]
     ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio-data:/data
+      - "4443:4443"
     networks:
       - pipeline-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-sf", "http://localhost:4443/storage/v1/b"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  minio-init:
-    image: minio/mc:latest
-    container_name: minio-init
+  fake-gcs-init:
+    image: curlimages/curl:latest
+    container_name: fake-gcs-init
     depends_on:
-      minio:
+      fake-gcs-server:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123};
-      mc mb --ignore-existing local/data-lake;
-      echo 'MinIO ready';
+      curl -sf -X POST http://fake-gcs-server:4443/storage/v1/b
+        -H 'Content-Type: application/json'
+        -d '{\"name\":\"${GCS_BUCKET:-data-lake\"}' &&
+      echo 'GCS bucket ready'
       "
     networks:
       - pipeline-net

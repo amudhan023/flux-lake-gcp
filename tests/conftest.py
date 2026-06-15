@@ -2,16 +2,13 @@ import os
 import pytest
 from pyspark.sql import SparkSession
 
-os.environ.setdefault("AWS_ACCESS_KEY_ID", "minioadmin")
-os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "minioadmin123")
-os.environ.setdefault("MINIO_ENDPOINT", "http://localhost:9000")
+os.environ.setdefault("STORAGE_BACKEND", "local")
 os.environ.setdefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:29092")
 os.environ.setdefault("ENABLE_DELTA_OPTIMIZE", "true")
 os.environ.setdefault("ENABLE_ZORDER", "false")  # skip in tests
 os.environ.setdefault("ENABLE_AQE", "true")
 os.environ.setdefault("ENABLE_BROADCAST_JOINS", "true")
 os.environ.setdefault("ENABLE_INCREMENTAL_GOLD", "true")
-os.environ.setdefault("S3_BUCKET", "data-lake")
 
 
 @pytest.fixture(scope="session")

@@ -3,17 +3,16 @@ from pyspark.sql import SparkSession, DataFrame
 from delta.tables import DeltaTable
 
 # STORAGE_BACKEND controls the URI scheme used for all Delta table paths.
-#   s3a  — MinIO or AWS S3 (local dev default)
-#   gcs  — Google Cloud Storage (set GCS_BUCKET as well)
-STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "s3a")
-GCS_BUCKET = os.getenv("GCS_BUCKET", "")
-S3_BUCKET = os.getenv("S3_BUCKET", "data-lake")
+#   gcs   — gs:// paths via GCS connector (default; works with emulator and real GCS)
+#   local — plain file paths with no connector (tests only)
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "gcs")
+GCS_BUCKET = os.getenv("GCS_BUCKET", "data-lake")
 
 
 def table_path(layer: str, table: str) -> str:
-    if STORAGE_BACKEND == "gcs":
-        return f"gs://{GCS_BUCKET}/{layer}/{table}"
-    return f"s3a://{S3_BUCKET}/{layer}/{table}"
+    if STORAGE_BACKEND == "local":
+        return f"{GCS_BUCKET}/{layer}/{table}"
+    return f"gs://{GCS_BUCKET}/{layer}/{table}"
 
 
 def table_exists(spark: SparkSession, path: str) -> bool:

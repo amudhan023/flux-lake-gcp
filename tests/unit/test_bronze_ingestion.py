@@ -35,8 +35,8 @@ def test_deduplication_on_same_transaction_id(spark, tmp_path):
     """Ingesting the same transaction_id twice should produce exactly 1 record."""
     from src.python.pipeline.bronze.ingest_transactions import ingest_batch
     import os
-    os.environ["S3_BUCKET"] = str(tmp_path)
-    os.environ["S3_ENDPOINT"] = "file://"
+    os.environ["STORAGE_BACKEND"] = "local"
+    os.environ["GCS_BUCKET"] = str(tmp_path)
 
     records = [
         {"event_type": "payment_created", "transaction_id": "txn_001", "merchant_id": "merch_1",

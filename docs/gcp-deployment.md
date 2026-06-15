@@ -2,7 +2,7 @@
 
 **Audience**: First-time GCP users deploying the batch data pipeline.
 
-**What you get**: The full pipeline stack (Spark, Kafka, Delta Lake, Grafana, Kibana, Jaeger) running on a single GCE virtual machine, with Google Cloud Storage (GCS) as the data lake instead of the local MinIO container.
+**What you get**: The full pipeline stack (Spark, Kafka, Delta Lake, Grafana, Kibana, Jaeger) running on a single GCE virtual machine, with Google Cloud Storage (GCS) as the data lake instead of the local fake-gcs-server emulator.
 
 ---
 
@@ -53,7 +53,7 @@
                    └─────────────────────────────────────┘
 ```
 
-**Key difference from local dev**: MinIO is removed. All Delta Lake tables are written directly to GCS using the `gs://` URI scheme and the Hadoop GCS Connector. The rest of the pipeline code is unchanged.
+**Key difference from local dev**: The local `fake-gcs-server` emulator is removed. All Delta Lake tables are written to your real GCS bucket using the same `gs://` URI scheme and Hadoop GCS Connector as in local dev — only `GCS_EMULATOR_HOST` is unset and service account credentials are injected.
 
 ---
 
@@ -89,10 +89,10 @@ gcloud auth login
 
 ```bash
 # Create a new project
-gcloud projects create my-pipeline-project --name="Pipeline Project"
+gcloud projects create my-fluxlake-gcp --name="FluxLakeGCP"
 
 # Set it as the active project for all gcloud commands
-gcloud config set project my-pipeline-project
+gcloud config set project my-fluxlake-gcp
 ```
 
 > **What is a project?** A GCP project is a container for all your cloud resources (VMs, buckets, IAM, billing). Think of it like a folder that groups everything for one application.
@@ -120,7 +120,7 @@ gcloud services enable \
 
 ## 4. Phase 2 — Create GCS Bucket (Data Lake)
 
-GCS replaces the local MinIO container. All Delta Lake tables live here.
+GCS replaces the local `fake-gcs-server` emulator. All Delta Lake tables live here.
 
 ### Step 4.1 — Choose a globally unique bucket name
 
@@ -128,7 +128,7 @@ Bucket names are global across all of GCP. Use a name that includes your project
 
 ```bash
 # Save the name in a shell variable — you'll reuse it throughout this guide
-export GCS_BUCKET="my-pipeline-project-datalake"
+export GCS_BUCKET="my-fluxlake-gcp-datalake"
 export GCP_REGION="us-central1"
 ```
 
@@ -155,11 +155,11 @@ gsutil cp /dev/null gs://${GCS_BUCKET}/spark-events/.keep
 ```bash
 gsutil ls gs://${GCS_BUCKET}/
 # Expected output:
-# gs://my-pipeline-project-datalake/bronze/
-# gs://my-pipeline-project-datalake/checkpoints/
-# gs://my-pipeline-project-datalake/gold/
-# gs://my-pipeline-project-datalake/silver/
-# gs://my-pipeline-project-datalake/spark-events/
+# gs://my-fluxlake-gcp-datalake/bronze/
+# gs://my-fluxlake-gcp-datalake/checkpoints/
+# gs://my-fluxlake-gcp-datalake/gold/
+# gs://my-fluxlake-gcp-datalake/silver/
+# gs://my-fluxlake-gcp-datalake/spark-events/
 ```
 
 ---
@@ -285,8 +285,8 @@ All remaining steps run **inside the VM** (via SSH).
 ### Step 7.1 — Clone the repository
 
 ```bash
-git clone https://github.com/amudhan023/pipeline-project.git
-cd pipeline-project
+git clone https://github.com/amudhan023/flux-lake-gcp.git
+cd flux-lake-gcp
 ```
 
 ### Step 7.2 — Copy the service account key to the VM
@@ -310,13 +310,13 @@ nano .env.gcp   # or: vi .env.gcp
 Edit the following values (replace placeholders with your real values):
 
 ```bash
-GCP_PROJECT_ID=my-pipeline-project          # your GCP project ID
+GCP_PROJECT_ID=my-fluxlake-gcp          # your GCP project ID
 GCP_REGION=us-central1
-GCS_BUCKET=my-pipeline-project-datalake     # the bucket you created in Phase 2
+GCS_BUCKET=my-fluxlake-gcp-datalake     # the bucket you created in Phase 2
 GCP_SA_KEY_PATH=/home/YOUR_USERNAME/gcp-sa-key.json   # path to your key file
 GCE_EXTERNAL_IP=34.72.183.45               # your VM's external IP from Step 6.2
 GRAFANA_ADMIN_PASSWORD=ChangeMe123!        # set a strong password
-CHECKPOINT_BASE=gs://my-pipeline-project-datalake/checkpoints
+CHECKPOINT_BASE=gs://my-fluxlake-gcp-datalake/checkpoints
 ```
 
 Save the file (in nano: `Ctrl+O`, `Enter`, `Ctrl+X`).
@@ -401,11 +401,11 @@ docker logs -f pipeline-api
 ```bash
 gsutil ls gs://${GCS_BUCKET}/bronze/
 # Expected:
-# gs://my-pipeline-project-datalake/bronze/raw_payments/
-# gs://my-pipeline-project-datalake/bronze/raw_refunds/
-# gs://my-pipeline-project-datalake/bronze/raw_chargebacks/
-# gs://my-pipeline-project-datalake/bronze/raw_settlements/
-# gs://my-pipeline-project-datalake/bronze/dead_letter/
+# gs://my-fluxlake-gcp-datalake/bronze/raw_payments/
+# gs://my-fluxlake-gcp-datalake/bronze/raw_refunds/
+# gs://my-fluxlake-gcp-datalake/bronze/raw_chargebacks/
+# gs://my-fluxlake-gcp-datalake/bronze/raw_settlements/
+# gs://my-fluxlake-gcp-datalake/bronze/dead_letter/
 ```
 
 Check the size of the Bronze layer:
@@ -726,7 +726,7 @@ gcloud projects delete ${GCP_PROJECT_ID} --quiet
 gcloud compute ssh pipeline-vm --zone=us-central1-a
 
 # On the VM:
-cd pipeline-project
+cd flux-lake-gcp
 make gcp-up                         # start all services
 make gcp-seed                       # generate 90 days of test data
 make gcp-run-pipeline               # trigger Bronze→Silver→Gold

@@ -1,8 +1,8 @@
 <div align="center">
 
-# Scalable Batch Data Processing Pipeline
+# FluxLakeGCP
 
-**PySpark · Delta Lake · Apache Kafka · MinIO/S3 · Full Observability**
+**PySpark · Delta Lake · Apache Kafka · GCS · Full Observability**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?logo=python&logoColor=white)](https://python.org)
 [![PySpark](https://img.shields.io/badge/PySpark-3.5.0-e25a1c?logo=apachespark&logoColor=white)](https://spark.apache.org)
@@ -74,8 +74,8 @@ flowchart TD
         K[("Apache Kafka\npayments.raw · 12 partitions")]
     end
 
-    subgraph DL["Data Lake — MinIO S3-compatible"]
-        subgraph BL["Bronze Layer  ·  s3://data-lake/bronze/"]
+    subgraph DL["Data Lake — GCS (fake-gcs-server locally · real GCS on GCP)"]
+        subgraph BL["Bronze Layer  ·  gs://data-lake/bronze/"]
             B1["raw_payments\nyear / month / day / region"]
             B2["raw_refunds"]
             B3["raw_chargebacks"]
@@ -83,13 +83,13 @@ flowchart TD
             B5["dead_letter"]
         end
 
-        subgraph SL["Silver Layer  ·  s3://data-lake/silver/"]
+        subgraph SL["Silver Layer  ·  gs://data-lake/silver/"]
             S1["cleansed_transactions"]
             S2["reconciliation_ledger"]
             S3["dispute_registry"]
         end
 
-        subgraph GL["Gold Layer  ·  s3://data-lake/gold/"]
+        subgraph GL["Gold Layer  ·  gs://data-lake/gold/"]
             G1["daily_merchant_summary"]
             G2["hourly_transaction_volume"]
             G3["reconciliation_report"]
@@ -139,16 +139,16 @@ flowchart LR
 ## 🔩 System Design
 
 <details>
-<summary><strong>MinIO over LocalStack</strong></summary>
+<summary><strong>fake-gcs-server over MinIO</strong></summary>
 
-MinIO is purpose-built for object storage with full S3 API compatibility and significantly lower resource overhead. LocalStack requires more memory and is primarily aimed at multi-AWS-service emulation — overkill for S3-only workloads.
+`fake-gcs-server` implements the real GCS REST API, so both local dev and production use the same Hadoop GCS connector and `gs://` URI scheme — no connector swap, no `AWS_*` env vars, no S3A path. The only difference between environments is whether `GCS_EMULATOR_HOST` is set (local) or unset (production, where ADC handles auth).
 
 </details>
 
 <details>
 <summary><strong>Spark Standalone over Kubernetes (local dev)</strong></summary>
 
-Kubernetes adds significant setup overhead (kind/minikube, node pools, RBAC). Spark Standalone mode delivers a real multi-worker cluster with the exact same code path, running in Docker Compose with a single command. Production would use EKS/GKE Spark Operator, but the pipeline code is identical.
+Kubernetes adds significant setup overhead (kind/minikube, node pools, RBAC). Spark Standalone mode delivers a real multi-worker cluster with the exact same code path, running in Docker Compose with a single command. Production would use GKE with the Spark Operator or GCP Dataproc, but the pipeline code is identical.
 
 </details>
 
@@ -248,8 +248,8 @@ sequenceDiagram
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/pipeline-project.git
-cd pipeline-project
+git clone https://github.com/your-org/flux-lake-gcp.git
+cd flux-lake-gcp
 
 # 2. Copy environment template
 cp .env.example .env
@@ -297,7 +297,7 @@ All services are healthy when `make up` prints the service URL table. The pipeli
 | Service | URL | Credentials |
 |---|---|---|
 | Spark Master UI | http://localhost:8080 | — |
-| MinIO Console | http://localhost:9001 | `minioadmin` / `minioadmin123` |
+| GCS Emulator API | http://localhost:4443 | — |
 | Kafka UI | http://localhost:8090 | — |
 | Grafana | http://localhost:3000 | `admin` / `admin123` |
 | Jaeger | http://localhost:16686 | — |
@@ -371,7 +371,7 @@ flowchart LR
     end
 
     subgraph Storage["Storage"]
-        MN["MinIO\n:9000 / :9001"]
+        MN["fake-gcs-server\n:4443"]
         KA["Kafka\n:9092"]
         ZK["Zookeeper\n:2181"]
     end
@@ -403,7 +403,7 @@ flowchart LR
 ```bash
 make up               # Start the full stack
 make down             # Tear down full stack (removes volumes)
-make infra-up         # Start infrastructure only (Spark, Kafka, MinIO, observability)
+make infra-up         # Start infrastructure only (Spark, Kafka, fake-gcs-server, observability)
 make infra-down       # Tear down infrastructure
 make seed             # Seed 90 days of historical Bronze data
 make run-pipeline     # Trigger full Bronze → Silver → Gold pipeline
@@ -671,13 +671,13 @@ open htmlcov/index.html
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| `Connection refused: minio:9000` | MinIO not healthy yet | `make logs minio` — wait for `S3-API: http://...` |
+| `Connection refused: fake-gcs-server:4443` | GCS emulator not healthy yet | `make logs fake-gcs-server` — wait for `server started` |
 | Spark OOM / executor killed | `SPARK_EXECUTOR_MEMORY` too low | Set `SPARK_EXECUTOR_MEMORY=8g` in `.env`, then `make down && make up` |
 | Port already in use | Conflicting local process | `lsof -i :<port>` · kill the process · or remap in `docker-compose.yml` |
 | Kafka `LEADER_NOT_AVAILABLE` | Kafka still initializing | Wait 30 s — brokers elect a leader within 15 s |
 | `TransactionConflictException` | Two Spark writers racing on the same Delta partition | Delta retries automatically. If persistent, reduce `SPARK_WORKERS`. |
 | Grafana shows no data | Pipeline has not run yet | Run `make seed && make run-pipeline` first |
-| MinIO auth failures | Credential mismatch | Ensure `AWS_ACCESS_KEY_ID` matches `MINIO_ROOT_USER` in `.env` |
+| GCS bucket not found | `fake-gcs-init` did not complete | `make logs fake-gcs-init` — re-run `make up` if it failed |
 
 ### Reprocessing a Historical Date
 
@@ -690,7 +690,7 @@ pyspark --master spark://spark-master:7077
 
 # 3. Delete the Gold partition for the date to reprocess
 from delta.tables import DeltaTable
-dt = DeltaTable.forPath(spark, "s3a://data-lake/gold/daily_merchant_summary")
+dt = DeltaTable.forPath(spark, "gs://data-lake/gold/daily_merchant_summary")
 dt.delete("report_date = '2026-01-15'")
 
 # 4. Re-trigger the pipeline for that specific date
@@ -741,7 +741,7 @@ Delta's ACID guarantees mean tables are **always consistent** after a crash — 
 If Silver is stuck mid-MERGE, verify the last committed version:
 
 ```bash
-spark.sql("DESCRIBE HISTORY delta.`s3a://data-lake/silver/cleansed_transactions`").show(5)
+spark.sql("DESCRIBE HISTORY delta.`gs://data-lake/silver/cleansed_transactions`").show(5)
 ```
 
 The last `COMMIT` entry is the authoritative state; everything after it was automatically rolled back.
@@ -753,7 +753,7 @@ The last `COMMIT` entry is the authoritative state; everything after it was auto
 ### Project Structure
 
 ```
-pipeline-project/
+flux-lake-gcp/
 ├── src/
 │   └── python/
 │       ├── pipeline/
