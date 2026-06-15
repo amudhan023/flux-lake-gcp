@@ -17,12 +17,12 @@ JAEGER_URL   = http://localhost:16686
 
 help:
 	@echo ""
-	@echo "  Pipeline Project — Make Targets"
+	@echo "  FluxLakeGCP — Make Targets"
 	@echo "  ────────────────────────────────────────────────────"
-	@echo "  Local (MinIO / Docker Compose)"
+	@echo "  Local (fake-gcs-server / Docker Compose)"
 	@echo "  make up               Start full stack"
 	@echo "  make down             Tear down full stack"
-	@echo "  make infra-up         Start infra only (Spark, Kafka, MinIO, obs.)"
+	@echo "  make infra-up         Start infra only (Spark, Kafka, fake-gcs-server, obs.)"
 	@echo "  make infra-down       Tear down infra"
 	@echo "  make seed             Seed 90 days of historical Bronze data"
 	@echo "  make run-pipeline     Trigger full Bronze→Silver→Gold pipeline"
@@ -56,12 +56,12 @@ up:
 	@echo ""
 	@echo "Stack is up. Service URLs:"
 	@echo "  Spark UI:      http://localhost:8080"
-	@echo "  MinIO Console: http://localhost:9001"
+	@echo "  GCS Emulator:  http://localhost:4443"
 	@echo "  Kafka UI:      http://localhost:8090"
 	@echo "  Grafana:       $(GRAFANA_URL)  (admin / admin123)"
 	@echo "  Jaeger:        $(JAEGER_URL)"
 	@echo "  Kibana:        $(KIBANA_URL)"
-	@echo "  Pipeline API:  http://localhost:8000"
+	@echo "  FluxLake API:  http://localhost:8000"
 
 down:
 	$(COMPOSE) down -v
@@ -76,7 +76,7 @@ infra-down:
 
 seed:
 	@echo "Seeding 90 days of historical Bronze data..."
-	docker exec pipeline-api python /app/scripts/seed_data.py
+	docker exec fluxlake-api python /app/scripts/seed_data.py
 	@echo "Seed complete."
 
 run-pipeline:
@@ -121,7 +121,7 @@ test-dq:
 
 benchmark:
 	@echo "Running SLA benchmark comparison (~15 minutes)..."
-	docker exec pipeline-api python /app/scripts/benchmark_comparison.py
+	docker exec fluxlake-api python /app/scripts/benchmark_comparison.py
 	@echo "Benchmark complete. Results in benchmark_results.json"
 	@echo "View: $(GRAFANA_URL)/d/sla-tracking"
 
@@ -143,7 +143,7 @@ jaeger:
 # ─── GCP Targets ─────────────────────────────────────────────────────────────
 
 gcp-up:
-	@echo "Starting stack on GCP (GCS backend, no MinIO)..."
+	@echo "Starting stack on GCP (real GCS backend, no emulator)..."
 	@test -f .env.gcp || (echo "ERROR: .env.gcp not found. Copy .env.gcp.example and fill in values." && exit 1)
 	$(COMPOSE_GCP) --env-file .env.gcp up -d \
 		--scale spark-worker-1=$(or $(SPARK_WORKERS),2)
@@ -154,14 +154,14 @@ gcp-up:
 	@echo "  Grafana:      http://<VM-IP>:3000  (admin / see .env.gcp)"
 	@echo "  Jaeger:       http://<VM-IP>:16686"
 	@echo "  Kibana:       http://<VM-IP>:5601"
-	@echo "  Pipeline API: http://<VM-IP>:8000"
+	@echo "  FluxLake API: http://<VM-IP>:8000"
 
 gcp-down:
 	$(COMPOSE_GCP) --env-file .env.gcp down -v
 
 gcp-seed:
 	@echo "Seeding Bronze data (GCS backend)..."
-	$(COMPOSE_GCP) --env-file .env.gcp exec pipeline-api python /app/scripts/seed_data.py
+	$(COMPOSE_GCP) --env-file .env.gcp exec fluxlake-api python /app/scripts/seed_data.py
 
 gcp-run-pipeline:
 	@echo "Triggering pipeline on GCP..."

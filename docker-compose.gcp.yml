@@ -61,8 +61,8 @@ services:
     environment:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://${GCE_EXTERNAL_IP:-localhost}:29092
 
-  # ─── Pipeline API: clear emulator, use real GCS ──────────────────────────────
-  pipeline-api:
+  # ─── FluxLake API: clear emulator, use real GCS ──────────────────────────────
+  fluxlake-api:
     environment:
       - STORAGE_BACKEND=gcs
       - GCS_BUCKET=${GCS_BUCKET}

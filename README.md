@@ -302,14 +302,14 @@ All services are healthy when `make up` prints the service URL table. The pipeli
 | Grafana | http://localhost:3000 | `admin` / `admin123` |
 | Jaeger | http://localhost:16686 | — |
 | Kibana | http://localhost:5601 | — |
-| Pipeline API | http://localhost:8000 | — |
+| FluxLake API | http://localhost:8000 | — |
 | Prometheus | http://localhost:9090 | — |
 
 ---
 
 ## 📡 API Reference
 
-The Pipeline API is a lightweight FastAPI service (`src/python/pipeline_api.py`) that controls and exposes the pipeline.
+The FluxLake API is a lightweight FastAPI service (`src/python/fluxlake_api.py`) that controls and exposes the pipeline.
 
 ### `GET /health`
 
@@ -367,7 +367,7 @@ flowchart LR
         SM["spark-master\n:8080"]
         SW1["spark-worker-1"]
         SW2["spark-worker-2"]
-        PA["pipeline-api\n:8000"]
+        PA["fluxlake-api\n:8000"]
     end
 
     subgraph Storage["Storage"]
@@ -682,8 +682,8 @@ open htmlcov/index.html
 ### Reprocessing a Historical Date
 
 ```bash
-# 1. Enter the pipeline-api container
-docker exec -it pipeline-api bash
+# 1. Enter the fluxlake-api container
+docker exec -it fluxlake-api bash
 
 # 2. Open a PySpark shell connected to the cluster
 pyspark --master spark://spark-master:7077
@@ -695,14 +695,14 @@ dt.delete("report_date = '2026-01-15'")
 
 # 4. Re-trigger the pipeline for that specific date
 import requests
-requests.post("http://pipeline-api:8000/trigger", json={"report_date": "2026-01-15"})
+requests.post("http://fluxlake-api:8000/trigger", json={"report_date": "2026-01-15"})
 ```
 
 ### Vacuuming Old Delta Files
 
 ```bash
 # Keeps 7 days (168 h) of history — safe for time travel within that window
-docker exec pipeline-api python -c "
+docker exec fluxlake-api python -c "
 from src.python.utils.spark_session import get_spark_session
 from src.python.optimization.delta_optimizer import vacuum_table
 spark = get_spark_session()
@@ -718,14 +718,14 @@ for layer, table in [('silver','cleansed_transactions'), ('gold','daily_merchant
 # Reset to earliest (reprocess all events from the beginning)
 docker exec kafka kafka-consumer-groups.sh \
   --bootstrap-server localhost:9092 \
-  --group pipeline-consumer \
+  --group fluxlake-consumer \
   --topic payments.raw \
   --reset-offsets --to-earliest --execute
 
 # Reset to a specific timestamp
 docker exec kafka kafka-consumer-groups.sh \
   --bootstrap-server localhost:9092 \
-  --group pipeline-consumer \
+  --group fluxlake-consumer \
   --topic payments.raw \
   --reset-offsets --to-datetime 2026-01-15T00:00:00.000 --execute
 ```
@@ -788,7 +788,7 @@ flux-lake-gcp/
 │   ├── run_pipeline.py               # CLI wrapper around POST /trigger
 │   └── benchmark_comparison.py      # Produces benchmark_results.json for Grafana
 ├── docker-compose.yml                # Full 12-service stack
-├── docker-compose.infra.yml          # Infrastructure only (no pipeline-api)
+├── docker-compose.infra.yml          # Infrastructure only (no fluxlake-api)
 ├── Makefile
 └── .env.example
 ```
@@ -796,7 +796,7 @@ flux-lake-gcp/
 ### Adding a New Gold Table
 
 1. Create `src/python/pipeline/gold/your_aggregation.py` with a `run_your_aggregation(spark, run_id)` function.
-2. Import and call it inside `_run_full_pipeline` in `src/python/pipeline_api.py` within a `tracker.stage(...)` block.
+2. Import and call it inside `_run_full_pipeline` in `src/python/fluxlake_api.py` within a `tracker.stage(...)` block.
 3. Add a unit test in `tests/unit/test_gold_aggregations.py` using the `chispa` DataFrame equality helpers.
 4. Add a Grafana dashboard panel pointing at the new Gold table via the Prometheus or Elasticsearch datasource.
 

@@ -6,9 +6,9 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  - job_name: "pipeline-api"
+  - job_name: "fluxlake-api"
     static_configs:
-      - targets: ["pipeline-api:8000"]
+      - targets: ["fluxlake-api:8000"]
     metrics_path: /metrics
 
   - job_name: "spark-master"

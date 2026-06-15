@@ -14,7 +14,7 @@ os.environ.setdefault("ENABLE_INCREMENTAL_GOLD", "true")
 @pytest.fixture(scope="session")
 def spark() -> SparkSession:
     return (
-        SparkSession.builder.appName("pipeline-tests")
+        SparkSession.builder.appName("fluxlake-tests")
         .master("local[2]")
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")

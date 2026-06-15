@@ -5,8 +5,8 @@
 Use Delta time travel to reset a date partition and rerun:
 
 ```bash
-# 1. Inside pipeline-api container
-docker exec -it pipeline-api bash
+# 1. Inside fluxlake-api container
+docker exec -it fluxlake-api bash
 
 # 2. Launch pyspark shell
 pyspark --master spark://spark-master:7077
@@ -18,14 +18,14 @@ dt.delete("report_date = '2026-01-15'")
 
 # 4. Trigger pipeline with specific date
 import requests
-requests.post("http://pipeline-api:8000/trigger", json={"report_date": "2026-01-15"})
+requests.post("http://fluxlake-api:8000/trigger", json={"report_date": "2026-01-15"})
 ```
 
 ## Vacuuming Old Delta Files
 
 ```bash
 # Safe vacuum — keeps 7 days (168h) of history
-docker exec pipeline-api python -c "
+docker exec fluxlake-api python -c "
 from src.python.utils.spark_session import get_spark_session
 from src.python.optimization.delta_optimizer import vacuum_table
 spark = get_spark_session()
@@ -41,14 +41,14 @@ for layer, table in [('silver','cleansed_transactions'), ('gold','daily_merchant
 # Reset to earliest (reprocess all events)
 docker exec kafka kafka-consumer-groups.sh \
   --bootstrap-server localhost:9092 \
-  --group pipeline-consumer \
+  --group fluxlake-consumer \
   --topic payments.raw \
   --reset-offsets --to-earliest --execute
 
 # Reset to specific timestamp
 docker exec kafka kafka-consumer-groups.sh \
   --bootstrap-server localhost:9092 \
-  --group pipeline-consumer \
+  --group fluxlake-consumer \
   --topic payments.raw \
   --reset-offsets --to-datetime 2026-01-15T00:00:00.000 --execute
 ```

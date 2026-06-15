@@ -1,7 +1,7 @@
 version: "3.9"
 
 networks:
-  pipeline-net:
+  fluxlake-net:
     driver: bridge
 
 volumes:
@@ -24,7 +24,7 @@ x-spark-common: &spark-common
     - ./src:/app/src
     - ./config/spark/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
   networks:
-    - pipeline-net
+    - fluxlake-net
   depends_on:
     - spark-master
 
@@ -48,7 +48,7 @@ services:
       - ./src:/app/src
       - ./config/spark/spark-defaults.conf:/opt/bitnami/spark/conf/spark-defaults.conf
     networks:
-      - pipeline-net
+      - fluxlake-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 10s
@@ -75,7 +75,7 @@ services:
     ports:
       - "4443:4443"
     networks:
-      - pipeline-net
+      - fluxlake-net
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:4443/storage/v1/b"]
       interval: 10s
@@ -96,7 +96,7 @@ services:
       echo 'GCS bucket ready'
       "
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   # ─── Kafka ───────────────────────────────────────────────────────────────────
   zookeeper:
@@ -108,7 +108,7 @@ services:
     ports:
       - "2181:2181"
     networks:
-      - pipeline-net
+      - fluxlake-net
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2181"]
       interval: 10s
@@ -136,7 +136,7 @@ services:
     volumes:
       - kafka-data:/var/lib/kafka/data
     networks:
-      - pipeline-net
+      - fluxlake-net
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 15s
@@ -154,7 +154,7 @@ services:
     ports:
       - "8090:8080"
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   # ─── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
@@ -166,7 +166,7 @@ services:
     ports:
       - "9090:9090"
     networks:
-      - pipeline-net
+      - fluxlake-net
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
@@ -188,7 +188,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   # ─── OpenTelemetry ───────────────────────────────────────────────────────────
   otel-collector:
@@ -201,7 +201,7 @@ services:
       - "4318:4318"
       - "8888:8888"
     networks:
-      - pipeline-net
+      - fluxlake-net
     depends_on:
       - jaeger
       - prometheus
@@ -215,7 +215,7 @@ services:
       - "16686:16686"
       - "14317:4317"
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   # ─── ELK Stack ───────────────────────────────────────────────────────────────
   elasticsearch:
@@ -230,7 +230,7 @@ services:
     ports:
       - "9200:9200"
     networks:
-      - pipeline-net
+      - fluxlake-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9200/_cluster/health"]
       interval: 15s
@@ -248,7 +248,7 @@ services:
     ports:
       - "5044:5044"
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.11.0
@@ -261,7 +261,7 @@ services:
     ports:
       - "5601:5601"
     networks:
-      - pipeline-net
+      - fluxlake-net
 
   filebeat:
     image: docker.elastic.co/beats/filebeat:8.11.0
@@ -273,16 +273,16 @@ services:
     environment:
       LOGSTASH_HOST: logstash:5044
     networks:
-      - pipeline-net
+      - fluxlake-net
     depends_on:
       - logstash
 
-  # ─── Pipeline API ─────────────────────────────────────────────────────────────
-  pipeline-api:
+  # ─── FluxLake API ─────────────────────────────────────────────────────────────
+  fluxlake-api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: pipeline-api
+    container_name: fluxlake-api
     environment:
       - SPARK_MASTER_URL=spark://spark-master:7077
       - STORAGE_BACKEND=gcs
@@ -308,4 +308,4 @@ services:
       - fake-gcs-server
       - kafka
     networks:
-      - pipeline-net
+      - fluxlake-net

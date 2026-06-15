@@ -19,22 +19,22 @@ from .pipeline.gold.ml_feature_store import run_feature_store
 from .metrics.sla_tracker import SLATracker
 from .tracing.otel_setup import init_tracer
 
-app = FastAPI(title="Pipeline API", version="1.0.0")
-init_tracer("pipeline-api")
+app = FastAPI(title="FluxLake API", version="1.0.0")
+init_tracer("fluxlake-api")
 
 _pipeline_status: dict = {"status": "idle", "last_run_id": None, "last_run_at": None}
 
 
 def _run_full_pipeline(run_id: str) -> None:
     global _pipeline_status
-    logger = get_logger("pipeline_api", run_id)
+    logger = get_logger("fluxlake_api", run_id)
     _pipeline_status = {"status": "running", "run_id": run_id, "started_at": datetime.now(timezone.utc).isoformat()}
 
     tracker = SLATracker(pipeline_name="full_pipeline")
     tracker.start()
 
     try:
-        spark = get_spark_session(app_name=f"pipeline_{run_id}")
+        spark = get_spark_session(app_name=f"fluxlake_{run_id}")
 
         with tracker.stage("silver_cleanse"):
             result = run_silver_cleanse(spark, run_id=run_id)

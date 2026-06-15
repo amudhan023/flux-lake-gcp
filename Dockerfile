@@ -14,7 +14,6 @@ RUN apt-get update && apt-get install -y python3-pip curl && \
         opentelemetry-exporter-otlp==1.22.0 \
         fastapi==0.109.0 \
         uvicorn==0.27.0 \
-        boto3==1.34.0 \
         great-expectations==0.18.8 \
         chispa==0.9.4 \
         pytest==7.4.4 \
@@ -30,4 +29,4 @@ COPY src/ /app/src/
 COPY scripts/ /app/scripts/
 COPY config/ /app/config/
 
-CMD ["uvicorn", "src.python.pipeline_api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.python.fluxlake_api:app", "--host", "0.0.0.0", "--port", "8000"]

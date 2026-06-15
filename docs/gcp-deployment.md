@@ -38,7 +38,7 @@
 │           │ events                   │ Delta read/write  │  Kibana            │   │
 │           ▼                         ▼                   └────────────────────┘   │
 │  ┌─────────────────┐       ┌──────────────────┐                                  │
-│  │  pipeline-api   │──────▶│   Delta Utils    │                                  │
+│  │  fluxlake-api   │──────▶│   Delta Utils    │                                  │
 │  │  (FastAPI)      │       │  gs:// scheme    │                                  │
 │  └─────────────────┘       └────────┬─────────┘                                  │
 │                                     │                                             │
@@ -245,7 +245,7 @@ gcloud compute firewall-rules create pipeline-ports \
   --description="Pipeline stack ports"
 ```
 
-> These ports expose: Pipeline API (8000), Spark UI (8080-8082), Kafka UI (8090), Grafana (3000), Kibana (5601), Prometheus (9090), Jaeger (16686), OTel (4317/4318), Kafka external (29092).
+> These ports expose: FluxLake API (8000), Spark UI (8080-8082), Kafka UI (8090), Grafana (3000), Kibana (5601), Prometheus (9090), Jaeger (16686), OTel (4317/4318), Kafka external (29092).
 
 ### Step 6.4 — SSH into the VM
 
@@ -347,7 +347,7 @@ spark-worker-2       Up 2 minutes
 kafka                Up 2 minutes (healthy)
 zookeeper            Up 2 minutes (healthy)
 kafka-ui             Up 2 minutes
-pipeline-api         Up 2 minutes
+fluxlake-api         Up 2 minutes
 prometheus           Up 2 minutes
 grafana              Up 2 minutes
 otel-collector       Up 2 minutes
@@ -358,7 +358,7 @@ kibana               Up 2 minutes
 filebeat             Up 2 minutes
 ```
 
-### Step 7.6 — Verify the Pipeline API is healthy
+### Step 7.6 — Verify the FluxLake API is healthy
 
 ```bash
 curl http://localhost:8000/health
@@ -393,7 +393,7 @@ This generates 90 days of synthetic payment/refund/chargeback/settlement events 
 ```bash
 make gcp-seed
 # Takes 5–10 minutes. Watch progress:
-docker logs -f pipeline-api
+docker logs -f fluxlake-api
 ```
 
 ### Step 8.2 — Verify data landed in GCS
@@ -433,7 +433,7 @@ curl http://localhost:8000/status
 Tail logs while it runs:
 
 ```bash
-docker logs -f pipeline-api
+docker logs -f fluxlake-api
 ```
 
 ### Step 8.4 — Verify Silver and Gold data in GCS
@@ -458,13 +458,13 @@ gsutil ls gs://${GCS_BUCKET}/gold/
 To test the streaming Bronze ingestion path:
 
 ```bash
-docker exec pipeline-api python /app/scripts/run_pipeline.py
+docker exec fluxlake-api python /app/scripts/run_pipeline.py
 ```
 
 Or produce events via the Kafka producer:
 
 ```bash
-docker exec pipeline-api python -c "
+docker exec fluxlake-api python -c "
 from src.python.ingestion.kafka_producer import produce_events
 produce_events(count=500, events_per_second=50)
 print('Done')
@@ -520,7 +520,7 @@ URL: `http://<VM-IP>:8080`
 
 URL: `http://<VM-IP>:16686`
 
-1. Select **Service**: `pipeline-api`
+1. Select **Service**: `fluxlake-api`
 2. Click **Find Traces**
 3. Click any trace to see the waterfall: `bronze_ingestion → kafka_consume → delta_write → silver_cleanse → ...`
 
@@ -554,7 +554,7 @@ pipeline_records_processed_total
 # Schema error rate
 rate(pipeline_schema_errors_total[5m])
 
-# Pipeline API request latency
+# FluxLake API request latency
 histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
 ```
 
@@ -570,7 +570,7 @@ Select your bucket to browse Delta table files, view partition structure, and ch
 
 | Port | Service | Who needs access |
 |------|---------|-----------------|
-| 8000 | Pipeline API | Your IP or team |
+| 8000 | FluxLake API | Your IP or team |
 | 8080 | Spark Master UI | Your IP |
 | 8081-8082 | Spark Worker UIs | Your IP |
 | 8090 | Kafka UI | Your IP |
@@ -602,7 +602,7 @@ gcloud compute firewall-rules create pipeline-myip \
 ```bash
 # Check logs for the specific container
 docker logs spark-master
-docker logs pipeline-api
+docker logs fluxlake-api
 docker logs kafka
 ```
 
@@ -640,10 +640,10 @@ gsutil ls gs://${GCS_BUCKET}/checkpoints/
 gsutil cp /dev/null gs://${GCS_BUCKET}/checkpoints/.keep
 ```
 
-### Pipeline API returns 500
+### FluxLake API returns 500
 
 ```bash
-docker logs pipeline-api --tail=50
+docker logs fluxlake-api --tail=50
 ```
 
 Look for: `Connection refused` (Spark not ready), `NoSuchBucketException` (wrong bucket name), `AccessDeniedException` (SA key issue).
