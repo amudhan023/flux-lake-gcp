@@ -55,7 +55,8 @@
 | **Full Observability** | Prometheus metrics · OpenTelemetry traces (Jaeger) · Structured logs (ELK) · 6 Grafana dashboards |
 | **ACID Guarantees** | Delta Lake transactions across all three layers — safe for concurrent Spark workers |
 | **Time Travel & Audit** | `VERSION AS OF` lets you reprocess or audit any historical date |
-| **One-command Local Stack** | `make up` starts 12+ services; `make seed && make run-pipeline` gives a full working dataset |
+| **Unified GCS Storage** | `fake-gcs-server` locally, real GCS on GCP — same `gs://` URI and connector in both environments |
+| **One-command Local Stack** | `make up` starts 16 services; `make seed && make run-pipeline` gives a full working dataset |
 
 ---
 
@@ -248,7 +249,7 @@ sequenceDiagram
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/flux-lake-gcp.git
+git clone https://github.com/amudhan023/flux-lake-gcp.git
 cd flux-lake-gcp
 
 # 2. Copy environment template
@@ -268,6 +269,9 @@ All tunable parameters live in `.env` (copy from `.env.example`):
 | `SPARK_EXECUTOR_MEMORY` | `4g` | Memory per executor |
 | `SPARK_EXECUTOR_CORES` | `2` | CPU cores per executor |
 | `KAFKA_PARTITIONS` | `12` | Topic partition count |
+| `GCS_BUCKET` | `data-lake` | GCS bucket name (local emulator) or real GCS bucket on GCP |
+| `GCS_EMULATOR_HOST` | `fake-gcs-server:4443` | GCS emulator endpoint — unset on GCP to use real GCS |
+| `STORAGE_BACKEND` | `gcs` | `gcs` for local/GCP; `local` for tests (plain file paths, no connector) |
 | `ENABLE_DELTA_OPTIMIZE` | `true` | Run `OPTIMIZE` before Gold aggregation |
 | `ENABLE_ZORDER` | `true` | Z-ORDER on `merchant_id`, `customer_id` |
 | `ENABLE_AQE` | `true` | Adaptive Query Execution |
@@ -401,7 +405,8 @@ flowchart LR
 ### Make Targets Reference
 
 ```bash
-make up               # Start the full stack
+# ── Local (fake-gcs-server) ───────────────────────────────────────────────────
+make up               # Start the full stack (16 services)
 make down             # Tear down full stack (removes volumes)
 make infra-up         # Start infrastructure only (Spark, Kafka, fake-gcs-server, observability)
 make infra-down       # Tear down infrastructure
@@ -413,7 +418,16 @@ make logs             # Tail all container logs
 make grafana          # Open Grafana in browser
 make kibana           # Open Kibana in browser
 make jaeger           # Open Jaeger in browser
+
+# ── GCP (real GCS backend) ────────────────────────────────────────────────────
+make gcp-up           # Start stack on GCP (requires .env.gcp — copy from .env.gcp.example)
+make gcp-down         # Tear down GCP stack
+make gcp-seed         # Seed Bronze data on GCP
+make gcp-run-pipeline # Trigger pipeline on GCP
+make gcp-logs         # Tail GCP stack logs
 ```
+
+> For full GCP deployment instructions see [`docs/gcp-deployment.md`](docs/gcp-deployment.md).
 
 ### Scaling Spark Workers
 
